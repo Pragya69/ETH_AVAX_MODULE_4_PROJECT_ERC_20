@@ -1,50 +1,55 @@
-pragma solidity ^0.8.23;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.18;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract DegenToken is ERC20, Ownable {
-    
-    mapping(address => uint256) public swordsOwned;
-    mapping(string => uint256) public itemRedemptionRates;
-    mapping(address => mapping(string => uint256)) public itemsOwned;
+contract DegenToken is ERC20, ERC20Burnable, Ownable {
+    event ItemRedeemed(address indexed user, uint256 amount, string item);
 
-    constructor() ERC20("Degen", "DGN") {
-        _mint(msg.sender, 10 * (10 ** uint256(decimals())));
+    // Mapping to keep track of available items and their corresponding token cost
+    mapping(string => uint256) public items;
+
+    constructor() ERC20("DegenToken", "DGN") {
+        // Example items with their token cost
+        items["Sword"] = 100;
+        items["Shield"] = 150;
+        items["Potion"] = 50;
     }
 
-    function setItemRedemptionRate(string memory itemName, uint256 rate) public onlyOwner {
-        itemRedemptionRates[itemName] = rate;
+    function mint(address recipient, uint256 amount) external onlyOwner {
+        _mint(recipient, amount);
     }
 
-    function redeemItem(string memory itemName, uint256 quantity) public {
-        uint256 cost = itemRedemptionRates[itemName] * quantity;
-        require(balanceOf(msg.sender) >= cost, "Not enough tokens to redeem for the item");
-
-        itemsOwned[msg.sender][itemName] += quantity;
-        _burn(msg.sender, cost);
+    function transfer(address recipient, uint256 amount) public override returns (bool) {
+        require(amount > 0, "Amount must be greater than zero.");
+        _transfer(_msgSender(), recipient, amount);
+        return true;
     }
 
-    function checkItemsOwned(address user, string memory itemName) public view returns (uint256) {
-        return itemsOwned[user][itemName];
+    function redeem(uint256 amount, string calldata item) external {
+        require(amount > 0, "Amount must be greater than zero.");
+        require(items[item] > 0, "Item does not exist.");
+        require(amount >= items[item], "Insufficient tokens to redeem this item.");
+
+        _burn(_msgSender(), amount);
+        // Logic to deliver the item to the player goes here
+
+        emit ItemRedeemed(_msgSender(), amount, item);
     }
 
-    function mintTokens(address to, uint256 amount) public onlyOwner {
-        _mint(to, amount);
-    }
-
-    function checkBalance(address account) public view returns (uint256) {
+    function checkBalance(address account) external view returns (uint256) {
         return balanceOf(account);
     }
 
-    function burnTokens(uint256 amount) public {
-        require(balanceOf(msg.sender) >= amount, "Not enough tokens to burn");
-        _burn(msg.sender, amount);
+    // Function to add new items to the store
+    function addItem(string calldata itemName, uint256 tokenCost) external onlyOwner {
+        items[itemName] = tokenCost;
     }
 
-    function transferTokens(address to, uint256 amount) public {
-        require(to != address(0), "Invalid address");
-        require(balanceOf(msg.sender) >= amount, "Not enough tokens to transfer");
-        _transfer(msg.sender, to, amount);
+    // Function to remove items from the store
+    function removeItem(string calldata itemName) external onlyOwner {
+        delete items[itemName];
     }
 }
